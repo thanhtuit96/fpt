@@ -22,7 +22,7 @@ MAPPING_CUSTOMER = [('id', 'id'),('name', 'name'),('phone', 'phone'),('address',
 MAPPING_ORDER = [('id', 'id'),('order_date', 'order_date'),('status', 'status'),('shipped_date', 'shipped_date'),('payment_status', 'payment_status'),('customer_id', 'customer_id'),('created_at', 'created_at'),('updated_at', 'updated_at')]
 MAPPING_ORDER_LINE = [('id', 'id'),('product_id', 'product_id'),('order_id', 'order_id'),('qty', 'qty'),('price', 'price'),('money', 'money'),('created_at', 'created_at'),('updated_at', 'updated_at')]
 
-mysql_fetch =  MySQLFetch("demo", "example","example", "10.7.10.15", cursor_type="dictcursor")
+mysql_fetch =  MySQLFetch("demo", "example","example", "192.168.1.7", cursor_type="dictcursor")
 
 MAPPING = [
     ('product', 'dim_product', MAPPING_PRODUCT),
@@ -33,7 +33,7 @@ MAPPING = [
 
 @task
 def extract_max_updated_at_from_dwh():
-    pf = PostgresFetch("dwh", "dwh_user", "10.7.10.15",port=5435)
+    pf = PostgresFetch("dwh", "dwh_user", "192.168.1.7",port=5435)
     product = pf.run(password="dwh_password", query="SELECT max(updated_at) as max_updated_at FROM dim_product")[0]
     customer = pf.run(password="dwh_password", query="SELECT max(updated_at) as max_updated_at FROM dim_customer")[0]
     sale_order = pf.run(password="dwh_password", query="SELECT max(updated_at) as max_updated_at FROM fact_sale_order")[0]
@@ -90,7 +90,7 @@ def load_product(records):
     if len(records) == 0:
         return;
     
-    pe = PostgresExecuteMany("dwh", "dwh_user", "10.7.10.15",port=5435)
+    pe = PostgresExecuteMany("dwh", "dwh_user", "192.168.1.7",port=5435)
     keys = [ dest for (_, dest) in MAPPING_PRODUCT ]
     recors_tuples = [ tuple([item.get(i) for i in keys] +  [datetime.now()]) for item in records]
     keys += ['dwh_changed_at']
@@ -103,7 +103,7 @@ def load_customer(records):
     if len(records) == 0:
         return;
     
-    pe = PostgresExecuteMany("dwh", "dwh_user", "10.7.10.15",port=5435)
+    pe = PostgresExecuteMany("dwh", "dwh_user", "192.168.1.7",port=5435)
     keys = [ dest for (_, dest) in MAPPING_CUSTOMER ]
     recors_tuples = [ tuple([item.get(i) for i in keys] +  [datetime.now()]) for item in records]
     keys += ['dwh_changed_at']
@@ -116,7 +116,7 @@ def load_sale_order(records):
     if len(records) == 0:
         return;
     
-    pe = PostgresExecuteMany("dwh", "dwh_user", "10.7.10.15",port=5435)
+    pe = PostgresExecuteMany("dwh", "dwh_user", "192.168.1.7",port=5435)
     keys = [ dest for (_, dest) in MAPPING_ORDER ]
     recors_tuples = [ tuple([item.get(i) for i in keys] +  [datetime.now()]) for item in records]
     keys += ['dwh_changed_at']
@@ -128,7 +128,7 @@ def load_sale_order(records):
 def load_order_line(records):
     if len(records) == 0:
         return;
-    pe = PostgresExecuteMany("dwh", "dwh_user", "10.7.10.15",port=5435)
+    pe = PostgresExecuteMany("dwh", "dwh_user", "192.168.1.7",port=5435)
     keys = [ dest for (_, dest) in MAPPING_ORDER_LINE ]
     recors_tuples = [ tuple([item.get(i) for i in keys] +  [datetime.now()]) for item in records]
     keys += ['dwh_changed_at']
@@ -148,7 +148,7 @@ def load_order_line(records):
 
 # @task
 # def load_data(records, table, mapping):
-#     pe = PostgresExecuteMany("dwh", "dwh_user", "10.7.10.15",port=5435)
+#     pe = PostgresExecuteMany("dwh", "dwh_user", "192.168.1.7",port=5435)
 #     keys = [ dest for (_, dest) in mapping ]
 #     recors_tuples = [ tuple([item.get(i) for i in keys] +  [datetime.now()]) for item in records]
 #     print(recors_tuples)
