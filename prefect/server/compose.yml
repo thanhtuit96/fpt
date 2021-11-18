@@ -1,0 +1,124 @@
+version: "3.7"
+services:
+  mysql: 
+    image: "mysql:5.7.36"
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: demo
+      MYSQL_USER: example
+      MYSQL_PASSWORD: example
+      MYSQL_ROOT_PASSWORD: example
+  dwh:
+    image: "postgres:11"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dwh_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dwh_password}
+      POSTGRES_DB: ${POSTGRES_DB:-dwh}
+    volumes:
+      - postgres_dwh:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    restart: "always"
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=150" 
+  
+  postgres:
+    image: "postgres:11"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-prefect_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-prefect_password}
+      POSTGRES_DB: ${POSTGRES_DB:-prefect_db}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    networks:
+      - prefect-server
+    restart: "always"
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=150"
+    
+  hasura:
+    image: "hasura/graphql-engine:v1.3.3"
+    command: "graphql-engine serve"
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgresql://prefect_user:prefect_password@postgres:5432/prefect_db
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+      HASURA_GRAPHQL_SERVER_PORT: "3000"
+      HASURA_GRAPHQL_QUERY_PLAN_CACHE_SIZE: 100
+      HASURA_GRAPHQL_LOG_LEVEL: "warn"
+    networks:
+      - prefect-server
+    restart: "always"
+    depends_on:
+      - postgres
+  
+  graphql:
+    image: "prefecthq/server:core-0.15.9"
+    command: bash -c "prefect-server database upgrade -y && python src/prefect_server/services/graphql/server.py"
+    environment:
+      PREFECT_SERVER_DB_CMD: prefect-server database upgrade -y
+      PREFECT_SERVER__DATABASE__CONNECTION_URL: postgresql://prefect_user:prefect_password@postgres:5432/prefect_db
+      PREFECT_SERVER__HASURA__ADMIN_SECRET: ${PREFECT_SERVER__HASURA__ADMIN_SECRET:-hasura-secret-admin-secret}
+      PREFECT_SERVER__HASURA__HOST: hasura
+    networks:
+      - prefect-server
+    restart: "always"
+    depends_on:
+      - hasura
+  
+  towel:
+    image: "prefecthq/server:core-0.15.9"
+    command: "python src/prefect_server/services/towel/__main__.py"
+    environment:
+      PREFECT_SERVER__HASURA__ADMIN_SECRET: ${PREFECT_SERVER__HASURA__ADMIN_SECRET:-hasura-secret-admin-secret}
+      PREFECT_SERVER__HASURA__HOST: hasura
+    networks:
+      - prefect-server
+    restart: "always"
+    depends_on:
+      - graphql
+  
+  apollo:
+    image: "prefecthq/apollo:core-0.15.9"
+    ports:
+      - "4200:4200"
+    command: bash -c "./post-start.sh && npm run serve"
+    environment:
+      HASURA_API_URL: http://hasura:3000/v1alpha1/graphql
+      PREFECT_API_URL: http://graphql:4201/graphql/
+      PREFECT_API_HEALTH_URL: http://graphql:4201/health
+      PREFECT_SERVER__TELEMETRY__ENABLED: "false"
+      GRAPHQL_SERVICE_HOST: http://graphql
+      GRAPHQL_SERVICE_PORT: 4201
+    networks:
+      - prefect-server
+    restart: "always"
+    depends_on:
+      - graphql
+  
+  ui:
+    image: "prefecthq/ui:core-0.15.9"
+    ports:
+      - "8080:8080"
+    command: "/intercept.sh"
+    environment:
+      PREFECT_SERVER__APOLLO_URL: http://localhost:4200/graphql
+    networks:
+      - prefect-server
+    restart: "always"
+    depends_on:
+      - apollo
+
+volumes:
+  postgres:
+  postgres_dwh:
+
+networks:
+  prefect-server:
+    name: prefect-server

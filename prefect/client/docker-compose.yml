@@ -1,0 +1,17 @@
+version: "3.7"
+
+services:
+
+    saleorder:
+        build: .
+        command: python3 /usr/app/saleorder.py
+        volumes:
+            - /srv/docker/prefect/flows:/root/.prefect/flows
+            - type: bind
+              source: ./saleorder.py
+              target: /usr/app/saleorder.py
+              read_only: true
+            - type: bind
+              source: ./config.toml
+              target: /root/.prefect/config.toml
+              read_only: true
